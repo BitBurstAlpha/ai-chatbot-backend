@@ -17,6 +17,5 @@ def health_check() -> Dict[str, Any]:
     return jsonify({
         "status": "ok",
         "timestamp": datetime.now().isoformat(),
-        "app_name": current_app.config["APP_NAME"],
         "version": "1.0.0"  # Should be loaded from package version
     })
