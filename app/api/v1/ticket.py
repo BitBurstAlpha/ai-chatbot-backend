@@ -1,15 +1,28 @@
 from datetime import datetime, timezone
 from flask import jsonify, request
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from app.extensions import db
 from app.models import Ticket
-from app.models.ticket import TicketReply 
+from app.models.ticket import TicketReply
+from app.models.user import User 
 
 from . import api_v1_bp
 
 # This endpoint allows users to create a new ticket.
 @api_v1_bp.route('/ticket', methods=['POST'])
+@jwt_required()
 def create_ticket():
     data = data = request.get_json()
+
+    # Get current user
+    current_user_id = get_jwt_identity()
+
+    user = db.session.query(User).get(current_user_id)
+
+    # Check if the user is an admin
+    if user.role != 'user':
+        return jsonify({"error": "You admins, are not authorized to perform this action! Only Users can create tickets"}), 403
+
     if not data:
             return jsonify({'error': 'Request body must be JSON'}), 400
     
@@ -37,7 +50,18 @@ def create_ticket():
         return jsonify({'error': 'Failed to create ticket', 'details': str(e)}), 500
 
 @api_v1_bp.route('/tickets', methods=['GET'])
+@jwt_required()
 def get_tickets():
+
+     # Get current user
+    current_user_id = get_jwt_identity()
+
+    user = db.session.query(User).get(current_user_id)
+
+    # Check if the user is an admin
+    if user.role != 'admin':
+        return jsonify({"error": "you haven't permission access this"}), 403
+
     status = request.args.get('status')
     assigned = request.args.get('assigned')
 
@@ -72,8 +96,19 @@ def get_tickets():
     return jsonify(ticket_list), 200
 
 @api_v1_bp.route('/tickets/<ticket_id>/status', methods=['PUT'])
+@jwt_required()
 def update_ticket_status(ticket_id):
     try:
+        
+         # Get current user
+        current_user_id = get_jwt_identity()
+
+        user = db.session.query(User).get(current_user_id)
+
+        # Check if the user is an admin
+        if user.role != 'admin':
+            return jsonify({"error": "you haven't permission access this"}), 403
+
         # Get the new status from request body
         data = request.get_json()
         if not data or 'status' not in data:
@@ -108,48 +143,79 @@ def update_ticket_status(ticket_id):
         return jsonify({'error': f'Failed to update ticket status: {str(e)}'}), 500
     
 @api_v1_bp.route('/tickets/<ticket_id>/assign', methods=['PUT'])
+@jwt_required()
 def assign_ticket(ticket_id):
     try:
-        # Get the agent_id from request body
-        data = request.get_json()
-        if not data or 'agent_id' not in data:
-            return jsonify({'error': 'Missing agent_id in request body'}), 400
-        
-        agent_id = data['agent_id']
-        
+        # Get current user
+        current_user_id = get_jwt_identity()
+        user = db.session.query(User).get(current_user_id)
+
+        if not user:
+            return jsonify({'error': 'Unauthorized user'}), 403
+
+        # Check user role
+        if user.role not in ['admin', 'agent']:
+            return jsonify({'error': "You don't have permission to assign tickets"}), 403
+
         # Find the ticket
         ticket = db.session.query(Ticket).get(ticket_id)
         if not ticket:
             return jsonify({'error': 'Ticket not found'}), 404
-        
-        # Update the agent assignment
-        ticket.agent_id = agent_id
-        
-        # If ticket was in 'open' status, move it to 'in_progress'
+
+        # Admin assigns to another agent
+        if user.role == 'admin':
+            data = request.get_json()
+            agent_id = data.get('agent_id') if data else None
+
+            if not agent_id:
+                return jsonify({'error': 'Missing agent_id in request body'}), 400
+
+            assigned_agent = db.session.query(User).get(agent_id)
+            if not assigned_agent or assigned_agent.role != 'agent':
+                return jsonify({'error': 'Invalid agent_id'}), 400
+
+            ticket.agent_id = agent_id
+
+        # Agent assigns the ticket to themselves
+        elif user.role == 'agent':
+            ticket.agent_id = current_user_id
+
+        # Update ticket status if open
         if ticket.status == 'open':
             ticket.status = 'in_progress'
-        
-        # Update assigned timestamp
+
+        # Set assignment timestamp
         ticket.assigned_at = datetime.now(timezone.utc)
-        
-        # Commit the changes
+
+        # Commit changes
         db.session.commit()
-        
+
         return jsonify({
             'ticket_id': str(ticket.id),
             'agent_id': ticket.agent_id,
             'status': ticket.status,
             'message': 'Agent assigned successfully'
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Failed to assign agent: {str(e)}'}), 500
 
 
+
 @api_v1_bp.route('/tickets/<ticket_id>/unassign', methods=['PUT'])
+@jwt_required()
 def unassign_ticket(ticket_id):
     try:
+
+        # Get current user
+        current_user_id = get_jwt_identity()
+
+        user = db.session.query(User).get(current_user_id)
+
+        # Check if the user is an admin
+        if user.role != 'admin':
+            return jsonify({"error": "you haven't permission access this"}), 403
         # Find the ticket
         ticket = db.session.query(Ticket).get(ticket_id)
         if not ticket:
@@ -180,70 +246,81 @@ def unassign_ticket(ticket_id):
         return jsonify({'error': f'Failed to unassign agent: {str(e)}'}), 500
     
 
+
 @api_v1_bp.route('/tickets/<ticket_id>/replies', methods=['POST'])
+@jwt_required()
 def add_ticket_reply(ticket_id):
     try:
-        # Get reply data from request body
+        # Get current user
+        current_user_id = get_jwt_identity()
+        user = db.session.query(User).get(current_user_id)
+
+        # Validate user role
+        if user.role not in ['user', 'agent']:
+            return jsonify({"error": "You don't have permission to access this"}), 403
+
+        # Parse and validate request JSON
         data = request.get_json()
         if not data:
             return jsonify({'error': 'Request body must be JSON'}), 400
-            
-        user_id = data.get('user_id')
-        agent_id = data.get('agent_id')
+
         message = data.get('message', '').strip()
-        
-        # Validate required fields
         if not message:
-            return jsonify({'error': 'message is required'}), 400
-            
-        # Either user_id or agent_id must be provided (not both)
-        if not (user_id or agent_id) or (user_id and agent_id):
-            return jsonify({'error': 'Either user_id or agent_id must be provided (not both)'}), 400
-            
-        # Find the ticket
+            return jsonify({'error': 'Message is required'}), 400
+
+        # Fetch the ticket
         ticket = db.session.query(Ticket).get(ticket_id)
         if not ticket:
             return jsonify({'error': 'Ticket not found'}), 404
-            
-        # Create new reply
+
+        # Create the reply
         new_reply = TicketReply(
             ticket_id=ticket_id,
-            user_id=user_id,
-            agent_id=agent_id,
+            user_id=current_user_id if user.role == "user" else None,
+            agent_id=current_user_id if user.role == "agent" else None,
             message=message
         )
-        
-        # Update ticket status based on who replied
-        if agent_id:
-            # If agent replied to a resolved ticket, keep it resolved
+
+        # Update ticket status and timestamps
+        if user.role == "agent":
             if ticket.status != 'resolved':
                 ticket.status = 'in_progress'
             ticket.last_agent_reply_at = datetime.now(timezone.utc)
-        elif user_id:
-            # If user replied to a resolved ticket, move back to in_progress
+        else:  # user.role == "user"
             if ticket.status == 'resolved':
                 ticket.status = 'in_progress'
             ticket.last_user_reply_at = datetime.now(timezone.utc)
-        
-        # Save the reply and update ticket
+
+        # Save changes
         db.session.add(new_reply)
         db.session.commit()
-        
+
         return jsonify({
             'message': 'Reply added successfully',
             'reply_id': str(new_reply.id),
             'ticket_id': str(ticket.id),
             'ticket_status': ticket.status
         }), 201
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Failed to add reply: {str(e)}'}), 500
     
 # Get all replies for a ticket
 @api_v1_bp.route('/tickets/<ticket_id>/replies', methods=['GET'])
+@jwt_required()
 def get_ticket_replies(ticket_id):
     try:
+
+       # Get current user
+        current_user_id = get_jwt_identity()
+
+        user = db.session.query(User).get(current_user_id)
+
+        # Check if the user is an user
+        if user.role != 'admin':
+            return jsonify({"error": "you haven't permission access this"}), 403
+
         # Find the ticket
         ticket = db.session.query(Ticket).get(ticket_id)
         if not ticket:
@@ -274,22 +351,33 @@ def get_ticket_replies(ticket_id):
 
 # Mark a ticket as resolved (by agent)
 @api_v1_bp.route('/tickets/<ticket_id>/resolve', methods=['PUT'])
+@jwt_required()
 def resolve_ticket(ticket_id):
     try:
+
+        # Get current user
+        current_user_id = get_jwt_identity()
+
+        user = db.session.query(User).get(current_user_id)
+
+        # Check if the user is an admin
+        if user.role != 'agent':
+            return jsonify({"error": "you haven't permission access this"}), 403
+
         data = request.get_json() or {}
-        resolution_note = data.get('resolution_note', '')
-        agent_id = data.get('agent_id')
         
-        if not agent_id:
-            return jsonify({'error': 'agent_id is required'}), 400
+        resolution_note = data.get('resolution_note', '')
+       
             
         # Find the ticket
         ticket = db.session.query(Ticket).get(ticket_id)
         if not ticket:
             return jsonify({'error': 'Ticket not found'}), 404
-            
+
+        print(f"Ticket found: {ticket.agent_id}")  # Debug print
+        print(f"Current user: {current_user_id}")  # Debug print
         # Check if the agent is assigned to this ticket
-        if ticket.agent_id != agent_id:
+        if ticket.agent_id != current_user_id:
             return jsonify({'error': 'Only the assigned agent can resolve this ticket'}), 403
             
         # Update ticket status
@@ -301,7 +389,7 @@ def resolve_ticket(ticket_id):
         if resolution_note:
             resolution_reply = TicketReply(
                 ticket_id=ticket_id,
-                agent_id=agent_id,
+                agent_id=current_user_id,
                 message=f"Resolution: {resolution_note}"
             )
             db.session.add(resolution_reply)
@@ -321,7 +409,18 @@ def resolve_ticket(ticket_id):
     
 # Get tickets assigned to a specific agent
 @api_v1_bp.route('/agents/<agent_id>/tickets', methods=['GET'])
+@jwt_required()
 def get_agent_tickets(agent_id):
+
+    # Get current user
+    current_user_id = get_jwt_identity()
+
+    user = db.session.query(User).get(current_user_id)
+
+    # Check if the user is an admin
+    if user.role != 'admin':
+        return jsonify({"error": "you haven't permission access this"}), 403
+
     status = request.args.get('status')
     
     ticket_query = db.session.query(Ticket).filter(Ticket.agent_id == agent_id)
