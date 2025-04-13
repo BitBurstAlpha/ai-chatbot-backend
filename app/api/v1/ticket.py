@@ -17,7 +17,7 @@ def create_ticket():
     # Get current user
     current_user_id = get_jwt_identity()
 
-    user = db.session.query(User).get(current_user_id)
+    user = db.session.get(User, current_user_id)
 
     # Check if the user is an admin
     if user.role != 'user':
