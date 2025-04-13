@@ -10,11 +10,14 @@ from flask_jwt_extended import JWTManager
 from app.models import *
 
 
-def create_app():
+def create_app(test_config):
     app = Flask(__name__)
 
     app.config.from_object(get_config())
     app.config.from_object(get_db_config())
+
+    if test_config is not None:
+        app.config.update(test_config)
 
     # Initialize extensions
     db.init_app(app)
