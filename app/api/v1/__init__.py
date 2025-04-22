@@ -6,3 +6,4 @@ from . import basic
 from . import ticket
 from . import auth
 from . import user
+from . import knowledge
