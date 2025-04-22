@@ -1,4 +1,5 @@
 from flask import Flask
+from flask_cors import CORS
 
 from app.extensions import db, migrate
 from .config.settings import get_config
@@ -12,6 +13,8 @@ from app.models import *
 
 def create_app(test_config):
     app = Flask(__name__)
+
+    CORS(app)
 
     app.config.from_object(get_config())
     app.config.from_object(get_db_config())
