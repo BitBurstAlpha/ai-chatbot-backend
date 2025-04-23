@@ -114,7 +114,7 @@ Answer:"""
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. Answer naturally, without mentioning context, in under 500 characters."},
+                {"role": "system", "content": "You are a helpful assistant. Answer naturally, without mentioning context, in under 250 characters."},
                 {"role": "user", "content": prompt},
             ],
             temperature=0.3,
