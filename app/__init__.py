@@ -14,7 +14,24 @@ from app.models import *
 def create_app(test_config):
     app = Flask(__name__)
 
-    CORS(app)
+     # List of allowed origins (production + local dev)
+    allowed_origins = [
+        "https://ai-chatbot-beta-azure.vercel.app",
+        "http://localhost:3000"  # Add other environments as needed
+    ]
+
+    # Configure CORS
+    CORS(
+        app,
+        resources={
+            r"/api/v1/*": {
+                "origins": allowed_origins,
+                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicit methods
+                "allow_headers": ["Content-Type", "Authorization"]  # Allowed headers
+            }
+        },
+        supports_credentials=True  # Enable if using cookies/auth
+    )
 
     app.config.from_object(get_config())
     app.config.from_object(get_db_config())
