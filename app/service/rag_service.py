@@ -114,7 +114,7 @@ Answer:"""
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "system", "content": "You are a helpful assistant. Answer concisely and naturally based on the given context, without mentioning 'provided context'."},
                 {"role": "user", "content": prompt},
             ],
             temperature=0.3,
