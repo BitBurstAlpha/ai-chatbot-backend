@@ -5,10 +5,44 @@ from flask import current_app, jsonify, request
 from werkzeug.utils import secure_filename
 from app.extensions import db
 from app.models.knowledge import KnowledgeBase
+from app.models.user import User
 from app.service.rag_service import generate_rag_response
 from app.service.storage_service import upload_to_s3
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from . import api_v1_bp
+
+@api_v1_bp.route('/knowledge', methods=['GET'])
+@jwt_required()
+def get_knowledge():
+    """Fetch knowledge base entries."""
+    # Get parameters from request
+    
+    # Get current user
+    current_user_id = get_jwt_identity()
+
+    user = db.session.query(User).get(current_user_id)
+
+  
+    try:
+         # Check if the user is an admin
+        if user.role != 'admin':
+            return jsonify({"error": "you haven't permission access this"}), 403
+        
+        """Get all knowledge base entries."""
+        knowledge_entries = db.session.query(KnowledgeBase).all()
+        return jsonify([{
+            'id': entry.id,
+            'title': entry.title,
+            'description': entry.description,
+            'original_filename': entry.original_filename,
+            'file_type': entry.file_type,
+            'file_size': entry.file_size,
+            'created_at': entry.created_at.isoformat() if entry.created_at else None
+        } for entry in knowledge_entries])
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # This endpoint allows users to create a new ticket.
 @api_v1_bp.route('/knowledge/upload', methods=['POST'])
