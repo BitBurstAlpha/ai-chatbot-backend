@@ -43,3 +43,23 @@ def create_agent():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "Failed to register user", "details": str(e)}), 500
+    
+
+@api_v1_bp.route('/user/me', methods=['GET'])
+@jwt_required()
+def get_user_info():
+    """Fetch user information."""
+    # Get current user
+    current_user_id = get_jwt_identity()
+
+    user = db.session.query(User).get(current_user_id)
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    return jsonify({
+        'id': user.id,
+        'email': user.email,
+        'role': user.role,
+        'created_at': user.created_at.isoformat() if user.created_at else None
+    })
