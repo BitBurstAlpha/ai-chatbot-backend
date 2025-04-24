@@ -138,6 +138,14 @@ def addKnowledgeToChatbot(chatbot_id):
         knowledge = db.session.query(KnowledgeBase).filter_by(id=knowledge_id, user_id=current_user_id).first()
         if not knowledge:
             return jsonify({"error": "Knowledge entry not found or unauthorized"}), 404
+        
+        existing_link = db.session.query(ChatbotKnowledge).filter_by(
+            chatbot_id=chatbot_id,
+            knowledge_id=knowledge_id
+        ).first()
+
+        if existing_link:
+            return jsonify({"error": "Knowledge entry already linked to this chatbot"}), 400
 
         # Create the ChatbotKnowledge entry
         new_knowledge = ChatbotKnowledge(
