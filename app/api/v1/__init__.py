@@ -7,3 +7,4 @@ from . import ticket
 from . import auth
 from . import user
 from . import knowledge
+from . import chatbot
