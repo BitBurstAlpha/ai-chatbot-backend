@@ -81,7 +81,8 @@ def get_tickets():
             'user_id': t.user_id,
             'query': t.query,
             'status': t.status,
-            'agent_id': t.agent_id
+            'agent_id': t.agent_id,
+            'name': t.name,
         }
         for t in tickets
     ]
