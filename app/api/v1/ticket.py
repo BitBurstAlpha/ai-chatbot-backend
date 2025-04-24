@@ -10,33 +10,26 @@ from . import api_v1_bp
 
 # This endpoint allows users to create a new ticket.
 @api_v1_bp.route('/ticket', methods=['POST'])
-@jwt_required()
 def create_ticket():
     data = data = request.get_json()
 
-    # Get current user
-    current_user_id = get_jwt_identity()
-
-    user = db.session.get(User, current_user_id)
-
     # Check if the user is an admin
-    if user.role != 'user':
-        return jsonify({"error": "You admins, are not authorized to perform this action! Only Users can create tickets"}), 403
 
     if not data:
             return jsonify({'error': 'Request body must be JSON'}), 400
     
-    user_id = data.get('user_id', '').strip()
+   
     query = data.get('query', '').strip()
+    name = data.get('name', '').strip()
 
     # Validate required fields
-    if not user_id:
-        return jsonify({'error': 'user_id is required'}), 400
+    if not name:
+        return jsonify({'error': 'name is required'}), 400
     if not query:
         return jsonify({'error': 'query is required'}), 400
 
     try:
-        new_ticket = Ticket(user_id=user_id, query=query)
+        new_ticket = Ticket(name=name, query=query)
         db.session.add(new_ticket)
         db.session.commit()
 

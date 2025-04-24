@@ -8,8 +8,9 @@ class Ticket(db.Model):
     __tablename__ = 'tickets'
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = db.Column(db.String(50), nullable=False, index=True)
+    user_id = db.Column(db.String(50), nullable=True, index=True)
     query = db.Column(db.Text, nullable=False)
+    name = db.Column(db.String(100), nullable=True)
     status = db.Column(db.String(20), nullable=False, default='open', index=True)
     agent_id = db.Column(db.String(50), nullable=True, index=True)
 
@@ -24,8 +25,8 @@ class Ticket(db.Model):
     # Relationship with replies
     replies = db.relationship('TicketReply', backref='ticket', lazy=True, cascade='all, delete-orphan')
     
-    def __init__(self, user_id, query, agent_id=None, status='open'):
-        self.user_id = user_id
+    def __init__(self, name, query, agent_id=None, status='open'):
+        self.name = name
         self.query = query
         self.agent_id = agent_id
         self.status = status
