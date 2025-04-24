@@ -13,7 +13,7 @@ from . import api_v1_bp
 
 @api_v1_bp.route('/chatbot', methods=['POST'])
 @jwt_required()
-def createChatbot():
+def createChatbot(): 
     """Fetch knowledge base entries."""
     current_user_id = get_jwt_identity()
 
@@ -45,6 +45,38 @@ def createChatbot():
             'user_id': new_entry.user_id,
             'created_at': new_entry.created_at.isoformat() if new_entry.created_at else None
         }), 201
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+
+
+@api_v1_bp.route('/chatbot', methods=['GET'])
+@jwt_required()
+def getChatbots():
+    """Fetch chatbots for the current user."""
+    current_user_id = get_jwt_identity()
+
+    
+
+    try:
+
+        user = db.session.query(User).get(current_user_id)
+
+        if user.role != 'user':
+            return jsonify({"error": "you haven't permission access this"}), 403
+
+
+        chatbots = db.session.query(Chatbot).filter_by(user_id=current_user_id).all()
+
+        chatbot_list = [{
+            'id': str(chatbot.id),
+            'name': chatbot.title,
+            'trained': 'TRAINED',
+            'status' : 'LIVE',
+        } for chatbot in chatbots]
+
+        return jsonify(chatbot_list), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
