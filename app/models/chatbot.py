@@ -29,3 +29,4 @@ class ChatbotKnowledge(db.Model):
         self.chatbot_id = chatbot_id
         self.knowledge_id = knowledge_id
         self.created_at = datetime.now(timezone.utc)
+        
