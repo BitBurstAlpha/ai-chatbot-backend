@@ -164,3 +164,46 @@ def addKnowledgeToChatbot(chatbot_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@api_v1_bp.route('/chatbot/<uuid:chatbot_id>/knowledge', methods=['GET'])
+@jwt_required()
+def getKnowledgeForChatbot(chatbot_id):
+    """Fetch all knowledge base entries linked to a specific chatbot for the current user."""
+    current_user_id = get_jwt_identity()
+
+    try:
+        user = db.session.query(User).get(current_user_id)
+        if user.role != 'user':
+            return jsonify({"error": "you haven't permission access this"}), 403
+
+        # Check chatbot ownership
+        chatbot = db.session.query(Chatbot).filter_by(id=chatbot_id, user_id=current_user_id).first()
+        if not chatbot:
+            return jsonify({"error": "Chatbot not found or unauthorized"}), 404
+
+        # Fetch all knowledge links for this chatbot
+        knowledge_links = db.session.query(ChatbotKnowledge).filter_by(chatbot_id=chatbot_id).all()
+
+        if not knowledge_links:
+            return jsonify([]), 200  # Return empty list if none
+
+        # Extract knowledge_ids from the links
+        knowledge_ids = [link.knowledge_id for link in knowledge_links]
+
+        # Fetch the actual knowledge entries, but only those that belong to this user
+        knowledges = db.session.query(KnowledgeBase).filter(
+            KnowledgeBase.id.in_(knowledge_ids),
+            KnowledgeBase.user_id == current_user_id
+        ).all()
+
+        result = [{
+            "id": kb.id,
+            "title": kb.title,
+            "description": kb.description,
+            "created_at": kb.created_at.isoformat() if kb.created_at else None
+        } for kb in knowledges]
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
