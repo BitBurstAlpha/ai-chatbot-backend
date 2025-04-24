@@ -207,3 +207,36 @@ def getKnowledgeForChatbot(chatbot_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+
+@api_v1_bp.route('/general/chatbot/<uuid:chatbot_id>/knowledge', methods=['GET'])
+def getKnowledgeForChatbotGeneral(chatbot_id):
+   
+    try:
+       
+        # Fetch all knowledge links for this chatbot
+        knowledge_links = db.session.query(ChatbotKnowledge).filter_by(chatbot_id=chatbot_id).all()
+
+        if not knowledge_links:
+            return jsonify([]), 200  # Return empty list if none
+
+        # Extract knowledge_ids from the links
+        knowledge_ids = [link.knowledge_id for link in knowledge_links]
+
+        # Fetch the actual knowledge entries, but only those that belong to this user
+        knowledges = db.session.query(KnowledgeBase).filter(
+            KnowledgeBase.id.in_(knowledge_ids),
+        ).all()
+
+        result = [{
+            "id": kb.id,
+            "title": kb.title,
+            "description": kb.description,
+            "created_at": kb.created_at.isoformat() if kb.created_at else None
+        } for kb in knowledges]
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
