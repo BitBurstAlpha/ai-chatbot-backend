@@ -16,37 +16,48 @@ from . import api_v1_bp
 @jwt_required()
 def get_knowledge():
     """Fetch knowledge base entries."""
-    # Get parameters from request
-    
-    # Get current user
     current_user_id = get_jwt_identity()
 
     user = db.session.query(User).get(current_user_id)
 
-  
     try:
-         # Check if the user is an admin
-        if user.role != 'admin':
-            return jsonify({"error": "you haven't permission access this"}), 403
-        
-        """Get all knowledge base entries."""
-        knowledge_entries = db.session.query(KnowledgeBase).all()
+        if user.role == 'admin':
+            # Admin: get all entries
+            knowledge_entries = db.session.query(KnowledgeBase).all()
+        elif user.role == 'user':
+            # Normal user: get only their own entries
+            knowledge_entries = db.session.query(KnowledgeBase).filter_by(user_id=current_user_id).all()
+        else:
+            return jsonify({"error": "Unauthorized role"}), 403
+
         return jsonify([{
             'id': entry.id,
             'title': entry.title,
+            'user_id': entry.user_id,
             'description': entry.description,
             'original_filename': entry.original_filename,
             'file_type': entry.file_type,
             'file_size': entry.file_size,
             'created_at': entry.created_at.isoformat() if entry.created_at else None
         } for entry in knowledge_entries])
-    
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 # This endpoint allows users to create a new ticket.
 @api_v1_bp.route('/knowledge/upload', methods=['POST'])
+@jwt_required()
 def upload_file():
+
+    # Get current user
+    current_user_id = get_jwt_identity()
+
+    user = db.session.query(User).get(current_user_id)
+
+    if user.role != 'user':
+            return jsonify({"error": "you haven't permission access this"}), 403
+
     """Upload a file to the knowledge base."""
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
@@ -102,7 +113,8 @@ def upload_file():
                 s3_key=s3_key,
                 original_filename=filename,
                 file_type=file_type,
-                file_size=file_size
+                file_size=file_size,
+                user_id=current_user_id,
             )
             db.session.add(new_entry)
             

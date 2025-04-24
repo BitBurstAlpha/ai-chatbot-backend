@@ -8,6 +8,7 @@ class KnowledgeBase(db.Model):
     __tablename__ = 'knowledge_base'
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(50), nullable=False, index=True)
     title = db.Column(db.String, nullable=False)
     description = db.Column(db.Text)
     s3_key = db.Column(db.String, nullable=False)
@@ -16,8 +17,9 @@ class KnowledgeBase(db.Model):
     file_size = db.Column(db.Integer) 
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
-    def to_dict(self, title, description,s3_key,original_filename, file_type, file_size):
+    def to_dict(self, user_id , title, description,s3_key,original_filename, file_type, file_size):
             self.title = title,
+            self.user_id = user_id,
             self.description = description,
             self.s3_key = s3_key,
             self.original_filename = original_filename,
